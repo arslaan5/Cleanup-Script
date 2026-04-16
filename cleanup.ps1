@@ -36,7 +36,7 @@ function Select-Drive {
             continue
         }
 
-        $global:SelectedDrive = $inputDrive.ToUpper()
+        $SelectedDrive = $inputDrive.ToUpper()
         $exists = Get-PSDrive -Name $SelectedDrive -ErrorAction SilentlyContinue
 
         if (-not $exists) {
@@ -46,11 +46,13 @@ function Select-Drive {
     } until ($exists)
 
     Write-Color "✔ Selected Drive: ${SelectedDrive}:" "Green"
+    return $SelectedDrive
 }
 
 # --- Disk Info (MB) ---
 function Get-DiskSpace {
-    $drive = Get-PSDrive -Name $SelectedDrive
+    param([string]$DriveLetter)
+    $drive = Get-PSDrive -Name $DriveLetter
     return [PSCustomObject]@{
         FreeMB  = [math]::Round($drive.Free / 1MB, 2)
         UsedMB  = [math]::Round($drive.Used / 1MB, 2)
@@ -72,6 +74,7 @@ function Create-RestorePoint {
 
 # --- Safe Cleanup ---
 function Safe-Cleanup {
+    param([string]$TargetDrive)
     Write-Color "`n🧹 SAFE CLEANUP" "Cyan"
 
     try {
@@ -80,15 +83,15 @@ function Safe-Cleanup {
     } catch {}
 
     try {
-        Remove-Item "C:\Windows\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item "$env:windir\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-Color "✔ Windows temp cleaned" "Green"
     } catch {}
 
     try {
-        $driveTemp = "${SelectedDrive}:\Temp"
+        $driveTemp = "${TargetDrive}:\Temp"
         if (Test-Path $driveTemp) {
             Remove-Item "$driveTemp\*" -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Color "✔ Drive temp cleaned (${SelectedDrive}:)" "Green"
+            Write-Color "✔ Drive temp cleaned (${TargetDrive}:)" "Green"
         }
     } catch {}
 
@@ -98,18 +101,16 @@ function Safe-Cleanup {
     } catch {}
 
     try {
-        Clear-RecycleBin -DriveLetter $SelectedDrive -Force -ErrorAction SilentlyContinue
-        Write-Color "✔ Recycle Bin cleaned (${SelectedDrive}:)" "Green"
+        Clear-RecycleBin -DriveLetter $TargetDrive -Force -ErrorAction SilentlyContinue
+        Write-Color "✔ Recycle Bin cleaned (${TargetDrive}:)" "Green"
     } catch {
         Write-Color "⚠️ Recycle Bin cleanup partial" "Yellow"
     }
 
     try {
-        net stop wuauserv 2>$null | Out-Null
-        net stop bits 2>$null | Out-Null
-        Remove-Item "C:\Windows\SoftwareDistribution\*" -Recurse -Force -ErrorAction SilentlyContinue
-        net start wuauserv 2>$null | Out-Null
-        net start bits 2>$null | Out-Null
+        Stop-Service -Name wuauserv, bits -Force -ErrorAction SilentlyContinue
+        Remove-Item "$env:windir\SoftwareDistribution\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Start-Service -Name wuauserv, bits -ErrorAction SilentlyContinue
         Write-Color "✔ Windows Update cache cleared" "Green"
     } catch {
         Write-Color "⚠️ Update cache cleanup partial" "Yellow"
@@ -126,12 +127,12 @@ function Moderate-Cleanup {
     } catch {}
 
     try {
-        Remove-Item "C:\Windows\Prefetch\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item "$env:windir\Prefetch\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-Color "✔ Prefetch cleaned" "Green"
     } catch {}
 
     try {
-        Get-ChildItem "C:\Windows\Logs" -Recurse -ErrorAction SilentlyContinue |
+        Get-ChildItem "$env:windir\Logs" -Recurse -ErrorAction SilentlyContinue |
         Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
         Write-Color "✔ Logs cleaned" "Green"
     } catch {}
@@ -164,21 +165,21 @@ function Aggressive-Cleanup {
 function Run-Cleanup {
     param($mode)
 
-    Select-Drive
+    $SelectedDrive = Select-Drive
     Create-RestorePoint
 
-    $before = Get-DiskSpace
+    $before = Get-DiskSpace -DriveLetter $SelectedDrive
 
     Write-Color "`n📊 BEFORE CLEANUP" "Cyan"
     Write-Color "Drive: ${SelectedDrive}:"
     Write-Color "Free: $($before.FreeMB) MB | Used: $($before.UsedMB) MB"
 
-    Safe-Cleanup
+    Safe-Cleanup -TargetDrive $SelectedDrive
 
     if ($mode -ge 2) { Moderate-Cleanup }
     if ($mode -ge 3) { Aggressive-Cleanup }
 
-    $after = Get-DiskSpace
+    $after = Get-DiskSpace -DriveLetter $SelectedDrive
     $gain = [math]::Round($after.FreeMB - $before.FreeMB, 2)
 
     # Prevent negative values
