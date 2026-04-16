@@ -7,7 +7,7 @@ if (-not ([Security.Principal.WindowsPrincipal] `
     [Security.Principal.WindowsIdentity]::GetCurrent()
     ).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
 
-    Write-Host "⚠️ Administrator rights required. Attempting to elevate..." -ForegroundColor Yellow
+    Write-Host "[!] Administrator rights required. Attempting to elevate..." -ForegroundColor Yellow
     Start-Sleep -Seconds 2
     Start-Process powershell `
         -ArgumentList "-ExecutionPolicy Bypass -File `"$PSCommandPath`"" `
@@ -41,7 +41,7 @@ function Select-Drive {
         $inputDrive = Read-Host "`nEnter drive letter (e.g., C)"
 
         if ([string]::IsNullOrWhiteSpace($inputDrive)) {
-            Write-Color "❌ Please enter a drive letter." "Red"
+            Write-Color "[✕] Please enter a drive letter." "Red"
             continue
         }
 
@@ -49,12 +49,12 @@ function Select-Drive {
         $exists = Get-PSDrive -Name $SelectedDrive -ErrorAction SilentlyContinue
 
         if (-not $exists) {
-            Write-Color "❌ Invalid drive. Try again." "Red"
+            Write-Color "[✕] Invalid drive. Try again." "Red"
         }
 
     } until ($exists)
 
-    Write-Color "✔ Selected Drive: ${SelectedDrive}:" "Green"
+    Write-Color "[✓] Selected Drive: ${SelectedDrive}:" "Green"
     return $SelectedDrive
 }
 
@@ -71,32 +71,32 @@ function Get-DiskSpace {
 
 # --- Restore Point ---
 function Create-RestorePoint {
-    Write-Color "`n📌 Creating Restore Point..." "Cyan"
+    Write-Color "`n[i] Creating Restore Point..." "Cyan"
 
     try {
         Checkpoint-Computer -Description "Cleanup Restore Point" -RestorePointType "MODIFY_SETTINGS" -ErrorAction Stop
-        Write-Color "✅ Restore point created" "Green"
+        Write-Color "[✓] Restore point created" "Green"
     } catch {
-        Write-Color "⚠️ Restore point skipped (System Protection disabled)" "Yellow"
+        Write-Color "[!] Restore point skipped (System Protection disabled)" "Yellow"
     }
 }
 
 # --- Safe Cleanup ---
 function Safe-Cleanup {
     param([string]$TargetDrive)
-    Write-Color "`n🧹 SAFE CLEANUP" "Cyan"
+    Write-Color "`n:: SAFE CLEANUP ::" "Cyan"
     Write-Progress -Activity "Windows Cleanup Utility" -Status "Running Safe Cleanup..." -PercentComplete 10
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Cleaning User Temp" -PercentComplete 15
         Remove-Item "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Color "✔ User temp cleaned" "Green"
+        Write-Color "  [✓] User temp cleaned" "Green"
     } catch {}
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Cleaning Windows Temp" -PercentComplete 20
         Remove-Item "$env:windir\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Color "✔ Windows temp cleaned" "Green"
+        Write-Color "  [✓] Windows temp cleaned" "Green"
     } catch {}
 
     try {
@@ -104,22 +104,22 @@ function Safe-Cleanup {
         $driveTemp = "${TargetDrive}:\Temp"
         if (Test-Path $driveTemp) {
             Remove-Item "$driveTemp\*" -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Color "✔ Drive temp cleaned (${TargetDrive}:)" "Green"
+            Write-Color "  [✓] Drive temp cleaned (${TargetDrive}:)" "Green"
         }
     } catch {}
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing DNS Cache" -PercentComplete 30
         ipconfig /flushdns | Out-Null
-        Write-Color "✔ DNS cache cleared" "Green"
+        Write-Color "  [✓] DNS cache cleared" "Green"
     } catch {}
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Emptying Recycle Bin" -PercentComplete 35
         Clear-RecycleBin -DriveLetter $TargetDrive -Force -ErrorAction SilentlyContinue
-        Write-Color "✔ Recycle Bin cleaned (${TargetDrive}:)" "Green"
+        Write-Color "  [✓] Recycle Bin cleaned (${TargetDrive}:)" "Green"
     } catch {
-        Write-Color "⚠️ Recycle Bin cleanup partial" "Yellow"
+        Write-Color "  [!] Recycle Bin cleanup partial" "Yellow"
     }
 
     try {
@@ -127,16 +127,16 @@ function Safe-Cleanup {
         Stop-Service -Name wuauserv, bits -Force -ErrorAction SilentlyContinue
         Remove-Item "$env:windir\SoftwareDistribution\*" -Recurse -Force -ErrorAction SilentlyContinue
         Start-Service -Name wuauserv, bits -ErrorAction SilentlyContinue
-        Write-Color "✔ Windows Update cache cleared" "Green"
+        Write-Color "  [✓] Windows Update cache cleared" "Green"
     } catch {
-        Write-Color "⚠️ Update cache cleanup partial" "Yellow"
+        Write-Color "  [!] Update cache cleanup partial" "Yellow"
     }
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing Windows Logs & Error Dumps" -PercentComplete 45
         Remove-Item "$env:LOCALAPPDATA\CrashDumps\*" -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item "$env:ProgramData\Microsoft\Windows\WER\*" -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Color "✔ Crash dumps and Windows Error Reporting cleaned" "Green"
+        Write-Color "  [✓] Crash dumps and Windows Error Reporting cleaned" "Green"
     } catch {}
 
     try {
@@ -145,7 +145,7 @@ function Safe-Cleanup {
         Stop-Service -Name FontCache -Force -ErrorAction SilentlyContinue
         Remove-Item "$env:windir\ServiceProfiles\LocalService\AppData\Local\FontCache\*" -Recurse -Force -ErrorAction SilentlyContinue
         Start-Service -Name FontCache -ErrorAction SilentlyContinue
-        Write-Color "✔ Windows Store & Font cache cleaned" "Green"
+        Write-Color "  [✓] Windows Store & Font cache cleaned" "Green"
     } catch {}
 
     try {
@@ -156,41 +156,41 @@ function Safe-Cleanup {
         Remove-Item "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cache\*" -Recurse -Force -ErrorAction SilentlyContinue
         # Mozilla Firefox
         Remove-Item "$env:LOCALAPPDATA\Mozilla\Firefox\Profiles\*\cache2\*" -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Color "✔ Browser caches cleared" "Green"
+        Write-Color "  [✓] Browser caches cleared" "Green"
     } catch {}
 }
 
 # --- Moderate Cleanup ---
 function Moderate-Cleanup {
-    Write-Color "`n⚙️ MODERATE CLEANUP" "Cyan"
+    Write-Color "`n:: MODERATE CLEANUP ::" "Cyan"
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Automating Disk Cleanup (cleanmgr)..." -PercentComplete 60
-        Write-Color "⏳ Running Windows Disk Cleanup engine..." "Cyan"
+        Write-Color "  [~] Running Windows Disk Cleanup engine..." "Cyan"
         
         $RegPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches"
         Get-ChildItem -Path $RegPath -ErrorAction SilentlyContinue | ForEach-Object {
             New-ItemProperty -Path $_.PSPath -Name "StateFlags0001" -Value 2 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
         }
         Start-Process -FilePath "cleanmgr.exe" -ArgumentList "/sagerun:1" -Wait -WindowStyle Hidden
-        Write-Color "✔ Windows Disk Cleanup complete" "Green"
+        Write-Color "  [✓] Windows Disk Cleanup complete" "Green"
     } catch {}
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Running DISM component cleanup..." -PercentComplete 65
-        Write-Color "⏳ Running DISM component cleanup (this may take several minutes)..." "Cyan"
+        Write-Color "  [~] Running DISM component cleanup (this may take several minutes)..." "Cyan"
         Dism.exe /online /Cleanup-Image /StartComponentCleanup
-        Write-Color "✔ DISM cleanup done" "Green"
+        Write-Color "  [✓] DISM cleanup done" "Green"
     } catch {}
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Checking Previous Windows Installations..." -PercentComplete 75
         if (Test-Path "$env:SystemDrive\Windows.old") {
-            Write-Color "⏳ Removing previous Windows installation (Windows.old)..." "Cyan"
+            Write-Color "  [~] Removing previous Windows installation (Windows.old)..." "Cyan"
             cmd.exe /c "takeown /F ""$env:SystemDrive\Windows.old"" /A /R /D Y > NUL"
             cmd.exe /c "icacls ""$env:SystemDrive\Windows.old"" /grant *S-1-5-32-544:F /T /C /Q > NUL"
             Remove-Item "$env:SystemDrive\Windows.old" -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Color "✔ Windows.old removed" "Green"
+            Write-Color "  [✓] Windows.old removed" "Green"
         }
     } catch {}
 
@@ -205,53 +205,53 @@ function Moderate-Cleanup {
         if (Test-Path "$env:USERPROFILE\.nuget\packages") { Remove-Item "$env:USERPROFILE\.nuget\packages\*" -Recurse -Force -ErrorAction SilentlyContinue }
         # Cargo
         if (Test-Path "$env:USERPROFILE\.cargo\registry\cache") { Remove-Item "$env:USERPROFILE\.cargo\registry\cache\*" -Recurse -Force -ErrorAction SilentlyContinue }
-        Write-Color "✔ Developer caches cleared" "Green"
+        Write-Color "  [✓] Developer caches cleared" "Green"
     } catch {}
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing Windows Logs & Prefetch..." -PercentComplete 85
         Remove-Item "$env:windir\Prefetch\*" -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Color "✔ Prefetch cleaned" "Green"
+        Write-Color "  [✓] Prefetch cleaned" "Green"
     } catch {}
 
     try {
         Get-ChildItem "$env:windir\Logs" -Recurse -ErrorAction SilentlyContinue |
         Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
-        Write-Color "✔ Logs cleaned" "Green"
+        Write-Color "  [✓] Logs cleaned" "Green"
     } catch {}
 }
 
 # --- Aggressive Cleanup ---
 function Aggressive-Cleanup {
-    Write-Color "`n🔥 AGGRESSIVE CLEANUP" "Red"
+    Write-Color "`n:: AGGRESSIVE CLEANUP ::" "Red"
 
-    $confirm = Read-Host "⚠️ This removes update rollback ability. Continue? (y/n)"
+    $confirm = Read-Host "[!] This removes update rollback ability. Continue? (y/n)"
     if ($confirm -ne "y") { return }
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Running DISM ResetBase..." -PercentComplete 90
-        Write-Color "⏳ Running DISM ResetBase (this may take several minutes)..." "Cyan"
+        Write-Color "  [~] Running DISM ResetBase (this may take several minutes)..." "Cyan"
         Dism.exe /online /Cleanup-Image /StartComponentCleanup /ResetBase
-        Write-Color "✔ ResetBase applied" "Green"
+        Write-Color "  [✓] ResetBase applied" "Green"
     } catch {}
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Deleting Shadow Copies..." -PercentComplete 93
         # Keeps new shadow copies but drops the old backups
         vssadmin delete shadows /all /quiet | Out-Null
-        Write-Color "✔ System Shadow Copies & old restore points deleted" "Green"
+        Write-Color "  [✓] System Shadow Copies & old restore points deleted" "Green"
     } catch {}
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Disabling Hibernation..." -PercentComplete 95
         powercfg -h off
-        Write-Color "✔ Hibernation disabled" "Green"
+        Write-Color "  [✓] Hibernation disabled" "Green"
     } catch {}
 
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing Event Viewer Logs..." -PercentComplete 99
         wevtutil el | ForEach-Object { wevtutil cl "$_" 2>$null }
-        Write-Color "✔ Event logs cleared" "Green"
+        Write-Color "  [✓] Event logs cleared" "Green"
     } catch {}
 }
 
@@ -266,7 +266,7 @@ function Run-Cleanup {
 
     $before = Get-DiskSpace -DriveLetter $SelectedDrive
 
-    Write-Color "`n📊 BEFORE CLEANUP" "Cyan"
+    Write-Color "`n:: BEFORE CLEANUP ::" "Cyan"
     Write-Color "Drive: ${SelectedDrive}:"
     Write-Color "Free: $($before.FreeMB) MB | Used: $($before.UsedMB) MB"
 
@@ -306,9 +306,9 @@ function Run-Cleanup {
     Write-Color " ╚═══════════════════════════════════════════════════════╝" "Cyan"
 
     if ($gain -eq 0) {
-        Write-Color "`n ℹ️  No significant space freed (already clean or minimal temp files)." "Yellow"
+        Write-Color "`n [i] No significant space freed (already clean or minimal temp files)." "Yellow"
     } else {
-        Write-Color "`n ✅  Successfully recovered $gain MB of space!" "Green"
+        Write-Color "`n [✓] Successfully recovered $gain MB of space!" "Green"
     }
 }
 
@@ -382,7 +382,7 @@ do {
     $mode = if ($choice -eq 4) { 3 } else { $choice }
     Run-Cleanup -mode $mode
 
-    $restart = Read-Host "`n🔄 Press ENTER to return to menu, or 'y' to Restart now... "
+    $restart = Read-Host "`n[?] Press ENTER to return to menu, or 'y' to Restart now... "
     if ($restart -eq "y") { Restart-Computer }
 
 } while ($true)
