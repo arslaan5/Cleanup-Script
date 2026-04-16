@@ -7,6 +7,8 @@ if (-not ([Security.Principal.WindowsPrincipal] `
     [Security.Principal.WindowsIdentity]::GetCurrent()
     ).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
 
+    Write-Host "⚠️ Administrator rights required. Attempting to elevate..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 2
     Start-Process powershell `
         -ArgumentList "-ExecutionPolicy Bypass -File `"$PSCommandPath`"" `
         -Verb RunAs
@@ -115,6 +117,22 @@ function Safe-Cleanup {
     } catch {
         Write-Color "⚠️ Update cache cleanup partial" "Yellow"
     }
+
+    try {
+        Remove-Item "$env:LOCALAPPDATA\CrashDumps\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item "$env:ProgramData\Microsoft\Windows\WER\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Color "✔ Crash dumps and Windows Error Reporting cleaned" "Green"
+    } catch {}
+
+    try {
+        # Chromium-based Edge
+        Remove-Item "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cache\*" -Recurse -Force -ErrorAction SilentlyContinue
+        # Google Chrome
+        Remove-Item "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cache\*" -Recurse -Force -ErrorAction SilentlyContinue
+        # Mozilla Firefox
+        Remove-Item "$env:LOCALAPPDATA\Mozilla\Firefox\Profiles\*\cache2\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Color "✔ Browser caches cleared" "Green"
+    } catch {}
 }
 
 # --- Moderate Cleanup ---
@@ -122,8 +140,19 @@ function Moderate-Cleanup {
     Write-Color "`n⚙️ MODERATE CLEANUP" "Cyan"
 
     try {
-        Dism.exe /online /Cleanup-Image /StartComponentCleanup | Out-Null
+        Write-Color "⏳ Running DISM component cleanup (this may take several minutes)..." "Cyan"
+        Dism.exe /online /Cleanup-Image /StartComponentCleanup
         Write-Color "✔ DISM cleanup done" "Green"
+    } catch {}
+
+    try {
+        if (Test-Path "$env:SystemDrive\Windows.old") {
+            Write-Color "⏳ Removing previous Windows installation (Windows.old)..." "Cyan"
+            cmd.exe /c "takeown /F ""$env:SystemDrive\Windows.old"" /A /R /D Y > NUL"
+            cmd.exe /c "icacls ""$env:SystemDrive\Windows.old"" /grant *S-1-5-32-544:F /T /C /Q > NUL"
+            Remove-Item "$env:SystemDrive\Windows.old" -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Color "✔ Windows.old removed" "Green"
+        }
     } catch {}
 
     try {
@@ -146,7 +175,8 @@ function Aggressive-Cleanup {
     if ($confirm -ne "y") { return }
 
     try {
-        Dism.exe /online /Cleanup-Image /StartComponentCleanup /ResetBase | Out-Null
+        Write-Color "⏳ Running DISM ResetBase (this may take several minutes)..." "Cyan"
+        Dism.exe /online /Cleanup-Image /StartComponentCleanup /ResetBase
         Write-Color "✔ ResetBase applied" "Green"
     } catch {}
 
