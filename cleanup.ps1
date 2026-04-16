@@ -78,18 +78,22 @@ function Create-RestorePoint {
 function Safe-Cleanup {
     param([string]$TargetDrive)
     Write-Color "`n🧹 SAFE CLEANUP" "Cyan"
+    Write-Progress -Activity "Windows Cleanup Utility" -Status "Running Safe Cleanup..." -PercentComplete 10
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Cleaning User Temp" -PercentComplete 15
         Remove-Item "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-Color "✔ User temp cleaned" "Green"
     } catch {}
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Cleaning Windows Temp" -PercentComplete 20
         Remove-Item "$env:windir\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-Color "✔ Windows temp cleaned" "Green"
     } catch {}
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Cleaning Drive Temp" -PercentComplete 25
         $driveTemp = "${TargetDrive}:\Temp"
         if (Test-Path $driveTemp) {
             Remove-Item "$driveTemp\*" -Recurse -Force -ErrorAction SilentlyContinue
@@ -98,11 +102,13 @@ function Safe-Cleanup {
     } catch {}
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing DNS Cache" -PercentComplete 30
         ipconfig /flushdns | Out-Null
         Write-Color "✔ DNS cache cleared" "Green"
     } catch {}
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Emptying Recycle Bin" -PercentComplete 35
         Clear-RecycleBin -DriveLetter $TargetDrive -Force -ErrorAction SilentlyContinue
         Write-Color "✔ Recycle Bin cleaned (${TargetDrive}:)" "Green"
     } catch {
@@ -110,6 +116,7 @@ function Safe-Cleanup {
     }
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing Windows Update Cache" -PercentComplete 40
         Stop-Service -Name wuauserv, bits -Force -ErrorAction SilentlyContinue
         Remove-Item "$env:windir\SoftwareDistribution\*" -Recurse -Force -ErrorAction SilentlyContinue
         Start-Service -Name wuauserv, bits -ErrorAction SilentlyContinue
@@ -119,12 +126,23 @@ function Safe-Cleanup {
     }
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing Windows Logs & Error Dumps" -PercentComplete 45
         Remove-Item "$env:LOCALAPPDATA\CrashDumps\*" -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item "$env:ProgramData\Microsoft\Windows\WER\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-Color "✔ Crash dumps and Windows Error Reporting cleaned" "Green"
     } catch {}
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing Windows Store & App Caches" -PercentComplete 50
+        Remove-Item "$env:LOCALAPPDATA\Packages\Microsoft.WindowsStore_8wekyb3d8bbwe\LocalCache\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Stop-Service -Name FontCache -Force -ErrorAction SilentlyContinue
+        Remove-Item "$env:windir\ServiceProfiles\LocalService\AppData\Local\FontCache\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Start-Service -Name FontCache -ErrorAction SilentlyContinue
+        Write-Color "✔ Windows Store & Font cache cleaned" "Green"
+    } catch {}
+
+    try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing Browser Caches" -PercentComplete 55
         # Chromium-based Edge
         Remove-Item "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cache\*" -Recurse -Force -ErrorAction SilentlyContinue
         # Google Chrome
@@ -140,12 +158,26 @@ function Moderate-Cleanup {
     Write-Color "`n⚙️ MODERATE CLEANUP" "Cyan"
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Automating Disk Cleanup (cleanmgr)..." -PercentComplete 60
+        Write-Color "⏳ Running Windows Disk Cleanup engine..." "Cyan"
+        
+        $RegPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches"
+        Get-ChildItem -Path $RegPath -ErrorAction SilentlyContinue | ForEach-Object {
+            New-ItemProperty -Path $_.PSPath -Name "StateFlags0001" -Value 2 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+        }
+        Start-Process -FilePath "cleanmgr.exe" -ArgumentList "/sagerun:1" -Wait -WindowStyle Hidden
+        Write-Color "✔ Windows Disk Cleanup complete" "Green"
+    } catch {}
+
+    try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Running DISM component cleanup..." -PercentComplete 65
         Write-Color "⏳ Running DISM component cleanup (this may take several minutes)..." "Cyan"
         Dism.exe /online /Cleanup-Image /StartComponentCleanup
         Write-Color "✔ DISM cleanup done" "Green"
     } catch {}
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Checking Previous Windows Installations..." -PercentComplete 75
         if (Test-Path "$env:SystemDrive\Windows.old") {
             Write-Color "⏳ Removing previous Windows installation (Windows.old)..." "Cyan"
             cmd.exe /c "takeown /F ""$env:SystemDrive\Windows.old"" /A /R /D Y > NUL"
@@ -156,6 +188,21 @@ function Moderate-Cleanup {
     } catch {}
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing Developer Caches..." -PercentComplete 80
+        # npm
+        if (Test-Path "$env:LOCALAPPDATA\npm-cache") { Remove-Item "$env:LOCALAPPDATA\npm-cache\*" -Recurse -Force -ErrorAction SilentlyContinue }
+        if (Test-Path "$env:APPDATA\npm-cache") { Remove-Item "$env:APPDATA\npm-cache\*" -Recurse -Force -ErrorAction SilentlyContinue }
+        # pip
+        if (Test-Path "$env:LOCALAPPDATA\pip\Cache") { Remove-Item "$env:LOCALAPPDATA\pip\Cache\*" -Recurse -Force -ErrorAction SilentlyContinue }
+        # NuGet
+        if (Test-Path "$env:USERPROFILE\.nuget\packages") { Remove-Item "$env:USERPROFILE\.nuget\packages\*" -Recurse -Force -ErrorAction SilentlyContinue }
+        # Cargo
+        if (Test-Path "$env:USERPROFILE\.cargo\registry\cache") { Remove-Item "$env:USERPROFILE\.cargo\registry\cache\*" -Recurse -Force -ErrorAction SilentlyContinue }
+        Write-Color "✔ Developer caches cleared" "Green"
+    } catch {}
+
+    try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing Windows Logs & Prefetch..." -PercentComplete 85
         Remove-Item "$env:windir\Prefetch\*" -Recurse -Force -ErrorAction SilentlyContinue
         Write-Color "✔ Prefetch cleaned" "Green"
     } catch {}
@@ -175,17 +222,27 @@ function Aggressive-Cleanup {
     if ($confirm -ne "y") { return }
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Running DISM ResetBase..." -PercentComplete 90
         Write-Color "⏳ Running DISM ResetBase (this may take several minutes)..." "Cyan"
         Dism.exe /online /Cleanup-Image /StartComponentCleanup /ResetBase
         Write-Color "✔ ResetBase applied" "Green"
     } catch {}
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Deleting Shadow Copies..." -PercentComplete 93
+        # Keeps new shadow copies but drops the old backups
+        vssadmin delete shadows /all /quiet | Out-Null
+        Write-Color "✔ System Shadow Copies & old restore points deleted" "Green"
+    } catch {}
+
+    try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Disabling Hibernation..." -PercentComplete 95
         powercfg -h off
         Write-Color "✔ Hibernation disabled" "Green"
     } catch {}
 
     try {
+        Write-Progress -Activity "Windows Cleanup Utility" -Status "Clearing Event Viewer Logs..." -PercentComplete 99
         wevtutil el | ForEach-Object { wevtutil cl "$_" 2>$null }
         Write-Color "✔ Event logs cleared" "Green"
     } catch {}
@@ -208,6 +265,10 @@ function Run-Cleanup {
 
     if ($mode -ge 2) { Moderate-Cleanup }
     if ($mode -ge 3) { Aggressive-Cleanup }
+
+    Write-Progress -Activity "Windows Cleanup Utility" -Status "Finishing up..." -PercentComplete 100
+    Start-Sleep -Seconds 1
+    Write-Progress -Activity "Windows Cleanup Utility" -Completed
 
     $after = Get-DiskSpace -DriveLetter $SelectedDrive
     $gain = [math]::Round($after.FreeMB - $before.FreeMB, 2)
