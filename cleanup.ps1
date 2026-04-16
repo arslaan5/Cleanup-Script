@@ -15,6 +15,13 @@ if (-not ([Security.Principal.WindowsPrincipal] `
     exit
 }
 
+# --- Window Styling ---
+$Host.UI.RawUI.WindowTitle = "Administrator: Windows Cleanup Utility PRO+"
+try {
+    $Host.UI.RawUI.WindowSize = New-Object System.Management.Automation.Host.Size(85, 35)
+    $Host.UI.RawUI.BufferSize = New-Object System.Management.Automation.Host.Size(85, 3000)
+} catch {}
+
 # --- Color output ---
 function Write-Color {
     param($Text, $Color = "White")
@@ -252,6 +259,8 @@ function Aggressive-Cleanup {
 function Run-Cleanup {
     param($mode)
 
+    $stopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+
     $SelectedDrive = Select-Drive
     Create-RestorePoint
 
@@ -278,46 +287,102 @@ function Run-Cleanup {
         $gain = 0
     }
 
-    Write-Color "`n📊 AFTER CLEANUP" "Cyan"
-    Write-Color "Free: $($after.FreeMB) MB | Used: $($after.UsedMB) MB"
+    $stopWatch.Stop()
+    $min = $stopWatch.Elapsed.Minutes
+    $sec = $stopWatch.Elapsed.Seconds
+    $timeString = "{0:D2}m {1:D2}s" -f $min, $sec
 
-    Write-Color "`n💾 SPACE FREED: $gain MB" "Green"
+    Write-Host "`n"
+    Write-Color " ╔═══════════════════════════════════════════════════════╗" "Cyan"
+    Write-Color " ║                 CLEANUP SUMMARY REPORT                ║" "Cyan"
+    Write-Color " ╠═══════════════════════════════════════════════════════╣" "Cyan"
+    Write-Color " ║  Target Drive    : $($SelectedDrive.PadRight(35)) ║" "White"
+    Write-Color " ║  Execution Time  : $($timeString.PadRight(35)) ║" "White"
+    Write-Color " ╟───────────────────────────────────────────────────────╢" "Cyan"
+    Write-Color " ║  Before Free     : $($($before.FreeMB.ToString() + ' MB').PadRight(35)) ║" "DarkGray"
+    Write-Color " ║  After Free      : $($($after.FreeMB.ToString() + ' MB').PadRight(35)) ║" "White"
+    Write-Color " ╟───────────────────────────────────────────────────────╢" "Cyan"
+    Write-Color " ║  SPACE FREED     : $($($gain.ToString() + ' MB').PadRight(35)) ║" "Green"
+    Write-Color " ╚═══════════════════════════════════════════════════════╝" "Cyan"
 
     if ($gain -eq 0) {
-        Write-Color "ℹ️ No significant space freed (already clean or minimal temp files)" "Yellow"
+        Write-Color "`n ℹ️  No significant space freed (already clean or minimal temp files)." "Yellow"
+    } else {
+        Write-Color "`n ✅  Successfully recovered $gain MB of space!" "Green"
     }
 }
 
-# --- Menu ---
-function Show-Menu {
-    Clear-Host
-    Write-Color "===============================" "Cyan"
-    Write-Color " Windows Cleanup Utility PRO+ " "White"
-    Write-Color "===============================" "Cyan"
-    Write-Color "1. Safe" "Green"
-    Write-Color "2. Moderate" "Yellow"
-    Write-Color "3. Aggressive" "Red"
-    Write-Color "4. Full" "Magenta"
-    Write-Color "5. Exit" "Gray"
+# --- Interactive Menu ---
+function Show-InteractiveMenu {
+    $options = @(
+        [PSCustomObject]@{ Label = "Safe Cleanup (Fast)"; Color = "Green"; Value = 1 }
+        [PSCustomObject]@{ Label = "Moderate Cleanup (Recommended)"; Color = "Yellow"; Value = 2 }
+        [PSCustomObject]@{ Label = "Aggressive Cleanup (Deep)"; Color = "Red"; Value = 3 }
+        [PSCustomObject]@{ Label = "Full Sweep (All of the above)"; Color = "Magenta"; Value = 4 }
+        [PSCustomObject]@{ Label = "Exit"; Color = "Gray"; Value = 5 }
+    )
+    $selection = 0
+
+    while ($true) {
+        Clear-Host
+        Write-Color "    __          ___           __                     " "Cyan"
+        Write-Color "    \ \        / (_)         / /                     " "Cyan"
+        Write-Color "     \ \  /\  / / _ _ __    / /_   _ __  _ __   _ __ " "Cyan"
+        Write-Color "      \ \/  \/ / | | '_ \  / '_ \ | '_ \| '_ \ | '__|" "Cyan"
+        Write-Color "       \  /\  /  | | | | |/ /  \ \| |_) | |_) || |   " "Cyan"
+        Write-Color "        \/  \/   |_|_| |_/_/    \_\ .__/| .__/ |_|   " "Cyan"
+        Write-Color "            WIN CLEANUP PRO+      | |   | |          " "Cyan"
+        Write-Color "                                  |_|   |_|          " "Cyan"
+        Write-Color ""
+        Write-Color "========================================================" "DarkGray"
+        Write-Color "  Use ↑/↓ to navigate, ENTER to select                  " "White"
+        Write-Color "========================================================" "DarkGray"
+        Write-Color ""
+
+        for ($i = 0; $i -lt $options.Count; $i++) {
+            if ($i -eq $selection) {
+                Write-Host "  > $($options[$i].Label) " -ForegroundColor "Black" -BackgroundColor $options[$i].Color
+            } else {
+                Write-Host "    $($options[$i].Label) " -ForegroundColor $options[$i].Color
+            }
+        }
+
+        Write-Color "`n========================================================" "DarkGray"
+
+        $keyInfo = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        $keyCode = $keyInfo.VirtualKeyCode
+        
+        # Up arrow
+        if ($keyCode -eq 38) {
+            $selection--
+            if ($selection -lt 0) { $selection = $options.Count - 1 }
+        }
+        # Down arrow
+        elseif ($keyCode -eq 40) {
+            $selection++
+            if ($selection -ge $options.Count) { $selection = 0 }
+        }
+        # Enter
+        elseif ($keyCode -eq 13) {
+            return $options[$selection].Value
+        }
+    }
 }
 
 # --- Main ---
 do {
-    Show-Menu
-    $choice = Read-Host "Select option"
+    $choice = Show-InteractiveMenu
 
-    switch ($choice) {
-        "1" { Run-Cleanup 1 }
-        "2" { Run-Cleanup 2 }
-        "3" { Run-Cleanup 3 }
-        "4" { Run-Cleanup 3 }
-        "5" { break }
-        default { Write-Color "Invalid option" "Red" }
+    if ($choice -eq 5) {
+        Clear-Host
+        break
     }
 
-    if ($choice -in @("1","2","3","4")) {
-        $restart = Read-Host "`n🔄 Restart now? (y/n)"
-        if ($restart -eq "y") { Restart-Computer }
-    }
+    # Map the menu selection appropriately
+    $mode = if ($choice -eq 4) { 3 } else { $choice }
+    Run-Cleanup -mode $mode
 
-} while ($choice -ne "5")
+    $restart = Read-Host "`n🔄 Press ENTER to return to menu, or 'y' to Restart now... "
+    if ($restart -eq "y") { Restart-Computer }
+
+} while ($true)
