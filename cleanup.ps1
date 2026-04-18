@@ -167,7 +167,7 @@ function Moderate-Cleanup {
     try {
         Write-Progress -Activity "Windows Cleanup Utility" -Status "Automating Disk Cleanup (cleanmgr)..." -PercentComplete 60
         Write-Color "  [~] Running Windows Disk Cleanup engine..." "Cyan"
-        
+
         $RegPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches"
         Get-ChildItem -Path $RegPath -ErrorAction SilentlyContinue | ForEach-Object {
             New-ItemProperty -Path $_.PSPath -Name "StateFlags0001" -Value 2 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
@@ -351,7 +351,7 @@ function Show-InteractiveMenu {
 
         $keyInfo = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         $keyCode = $keyInfo.VirtualKeyCode
-        
+
         # Up arrow
         if ($keyCode -eq 38) {
             $selection--
