@@ -17,7 +17,7 @@ jobs:
         shell: pwsh
         run: |
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -AcceptLicense
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -AcceptLicense -RequiredVersion 1.21.0
           $results = Invoke-ScriptAnalyzer -Path .\cleanup.ps1 -Settings .\PSScriptAnalyzerSettings.psd1
           if ($results) {
               $results | Format-Table
