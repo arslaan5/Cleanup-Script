@@ -8,6 +8,7 @@ A powerful, interactive, and professional Windows cleanup script designed to rec
 - **Safe Mode:** Clears user temp, Windows temp, DNS cache, recycle bin, and browser caches. No risk to OS stability.
 - **Moderate Mode:** Automates Windows native `cleanmgr`, triggers DISM component cleanup, and deletes stale developer caches (npm, pip, NuGet, Cargo).
 - **Aggressive Mode:** Performs a DISM '/ResetBase', deletes hidden volume shadow copies, and disables hibernation for massive space recovery. (Use with caution).
+- **Dry-Run Mode:** Preview cleanup actions without deleting anything using `-DryRun` or `-WhatIf`.
 - **Summary Report:** Displays a comprehensive execution time and space recovered receipt upon completion.
 
 ## 🛠️ Usage
@@ -18,6 +19,10 @@ A powerful, interactive, and professional Windows cleanup script designed to rec
 4. Select your desired cleanup mode using your Up/Down arrow keys.
 
 _Alternatively, run `cleanup.ps1` from an elevated PowerShell prompt._
+
+### Optional flags
+
+- `-DryRun` / `-WhatIf`: shows what would be removed without changing the system.
 
 ## ⚠️ Disclaimer
 
